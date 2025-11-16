@@ -10,7 +10,6 @@ use base64::Engine;
 use crossbeam_utils::atomic::AtomicCell;
 use ipnetwork::Ipv4Network;
 use rsa::rand_core::RngCore;
-use sha2::Digest;
 
 use crate::core::entity::WireGuardConfig;
 
@@ -291,15 +290,8 @@ impl VntsWebService {
     pub fn verify_group_password(&self, req: VerifyPasswordReq) -> anyhow::Result<()> {  
         if let Some(network_info) = self.cache.virtual_network.get(&req.group) {  
             let guard = network_info.read();  
-            if let Some(password_hash) = &guard.password {  
-                // 对用户输入的密码进行哈希  
-                use sha2::Digest;  
-                let mut hasher = sha2::Sha256::new();  
-                hasher.update(req.password.as_bytes());  
-                hasher.update(req.group.as_bytes()); // 加盐  
-                let input_hash = format!("{:x}", hasher.finalize());  
-              
-                if &input_hash == password_hash {  
+            if let Some(password) = &guard.password {  
+                if password == &req.password {  
                     Ok(())  
                 } else {  
                     Err(anyhow!("密码错误"))  
@@ -310,12 +302,5 @@ impl VntsWebService {
         } else {  
             Err(anyhow!("组网不存在"))  
         }  
-    }
-    
-    fn hash_password(password: &str, salt: &str) -> String {  
-        let mut hasher = sha2::Sha256::new();  
-        hasher.update(password.as_bytes());  
-        hasher.update(salt.as_bytes());  
-        format!("{:x}", hasher.finalize())  
     }
 }
