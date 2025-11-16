@@ -1,20 +1,23 @@
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 use std::net::{Ipv4Addr, SocketAddr};
 
 use chrono::{DateTime, Local};
 use tokio::sync::mpsc::Sender;
-
-#[derive(Clone, Debug)]
-pub struct WireGuardConfig {
-    pub vnts_endpoint: String,
-    pub vnts_allowed_ips: String,
-    pub group_id: String,
-    pub device_id: String,
-    pub ip: Ipv4Addr,
-    pub prefix: u8,
-    pub persistent_keepalive: u16,
-    pub secret_key: [u8; 32],
-    pub public_key: [u8; 32],
+  
+#[derive(Clone, Debug, Serialize, Deserialize)]  
+pub struct WireGuardConfig {  
+    pub vnts_endpoint: String,  
+    pub vnts_allowed_ips: String,  
+    pub group_id: String,  
+    pub device_id: String,  
+    pub ip: Ipv4Addr,  
+    pub prefix: u8,  
+    pub persistent_keepalive: u16,  
+    #[serde(with = "serde_bytes")]  
+    pub secret_key: [u8; 32],  
+    #[serde(with = "serde_bytes")]  
+    pub public_key: [u8; 32],  
 }
 /// 网段信息
 #[derive(Default, Debug)]
