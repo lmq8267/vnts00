@@ -321,12 +321,21 @@ impl ServerPacketHandler {
                         // 响应 Pong 包  
                         let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
                       
+                        // 使用 match 或 map_err 来处理错误,而不是 ?  
                         let vec = vec![0u8; 12 + 4 + ENCRYPTION_RESERVED];  
-                        let mut packet = NetPacket::new_encrypt(vec)?;  
+                        let mut packet = match NetPacket::new_encrypt(vec) {  
+                            Ok(p) => p,  
+                            Err(e) => return Ok(Err(e.into())),  
+                        };  
                         packet.set_protocol(Protocol::Control);  
                         packet.set_transport_protocol(control_packet::Protocol::Pong.into());  
-                        packet.set_payload(net_packet.payload())?;  
-                        let mut pong_packet = control_packet::PongPacket::new(packet.payload_mut())?;  
+                        if let Err(e) = packet.set_payload(net_packet.payload()) {  
+                            return Ok(Err(e.into()));  
+                        }  
+                        let mut pong_packet = match control_packet::PongPacket::new(packet.payload_mut()) {  
+                            Ok(p) => p,  
+                            Err(e) => return Ok(Err(e.into())),  
+                        };  
                         pong_packet.set_epoch(0);  
                       
                         packet.set_source(client_gateway.into());  
