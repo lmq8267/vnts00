@@ -243,6 +243,7 @@ impl ServerPacketHandler {
                         if let ipv4::protocol::Protocol::Icmp = ipv4.protocol() {  
                             let mut icmp_packet = icmp::IcmpPacket::new(ipv4.payload_mut())?;  
                             if icmp_packet.kind() == Kind::EchoRequest {  
+                                println!("收到 ping 请求: 源={}, 目标={}", source, destination);
                                 let dest_u32: u32 = destination.into();  
                                 let is_gateway = destination == self.config.gateway;  
               
@@ -251,18 +252,27 @@ impl ServerPacketHandler {
                                 if (dest_u32 & 0xFF) == 1 {  
                                     // 获取目标地址的网段（前三个字节）  
                                     let dest_subnet = dest_u32 & 0xFFFFFF00;  
+                                    println!("检查是否为客户端网段网关: 目标网段={:08x}", dest_subnet); 
                   
                                     // 检查是否有客户端在这个网段  
                                     for client_ip in link_context.network_info.read().clients.keys() {  
                                         let client_subnet = client_ip & 0xFFFFFF00;  
+                                        println!("客户端 IP={:08x}, 网段={:08x}", client_ip, client_subnet); 
                                         if dest_subnet == client_subnet {  
                                             is_client_subnet_gateway = true;  
+                                            println!("找到匹配的客户端网段！"); 
                                             break;  
                                         }  
                                     }  
                                 }  
+                                println!(  
+                                    "Ping 响应判断: is_gateway={}, is_client_subnet_gateway={}",   
+                                    is_gateway,   
+                                    is_client_subnet_gateway  
+                                ); 
               
                                 if is_gateway || is_client_subnet_gateway {  
+                                    println!("响应 ping: {} -> {}", destination, source); 
                                     icmp_packet.set_kind(Kind::EchoReply);  
                                     icmp_packet.update_checksum();  
                                     ipv4.set_source_ip(destination);  
@@ -272,6 +282,8 @@ impl ServerPacketHandler {
                                         net_packet.data_len(),  
                                         net_packet.raw_buffer().to_vec(),  
                                     )?));  
+                                } else {  
+                                    println!("不响应 ping: 目标={} 不是网关或客户端网段网关", destination);  
                                 }  
                             }  
                         }  
@@ -431,11 +443,12 @@ impl ServerPacketHandler {
         };
         let register_response = generate_ip(&self.cache, register_client_request).await?;
         let virtual_ip = register_response.virtual_ip.into();
-        // 计算客户端所在网段的网关 IP（x.x.x.1）  
-        let virtual_ip_u32: u32 = virtual_ip;  
-        let client_gateway = (virtual_ip_u32 & 0xFFFFFF00) | 1; // 保留前三个字节，最后一个字节设为 1
+        // 计算客户端所在网段的网关 IP（x.x.x.1）
+        let virtual_ip_u32: u32 = virtual_ip.into();
+        let client_gateway_u32 = (virtual_ip_u32 & 0xFFFFFF00) | 1; // 保留前三个字节，最后一个字节设为 1
+        let client_gateway = Ipv4Addr::from(client_gateway_u32);
         
-        response.virtual_gateway = client_gateway; // 使用客户端网段的 .1 作为网关
+        response.virtual_gateway = client_gateway.into(); // 使用客户端网段的 .1 作为网关
         response.virtual_netmask = netmask.into();
         response.virtual_ip = virtual_ip;
         response.epoch = register_response.epoch as u32;
