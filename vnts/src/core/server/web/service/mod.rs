@@ -62,16 +62,7 @@ impl VntsWebService {
     pub fn check_auth(&self, auth: &String) -> bool {
         self.cache.auth_map.get(auth).is_some()
     }
-    pub fn group_list(&self) -> GroupList {
-        let group_list: Vec<String> = self
-            .cache
-            .virtual_network
-            .key_values()
-            .into_iter()
-            .map(|(key, _)| key)
-            .collect();
-        GroupList { group_list }
-    }
+
     pub fn remove_client(&self, req: RemoveClientReq) {  
         if let Some(ip) = req.virtual_ip {  
             if let Some(network_info) = self.cache.virtual_network.get(&req.group_id) {  
