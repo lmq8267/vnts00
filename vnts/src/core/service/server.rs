@@ -318,55 +318,45 @@ impl ServerPacketHandler {
                 let dest_subnet = dest_u32 & 0xFFFFFF00;  
                   
                 if source_subnet == dest_subnet {  
-                    println!("检测到客户端网段网关心跳包: 源={}, 目标={}", source, destination);  
-                    let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
-                    println!("准备响应 Pong: 网关={}", Ipv4Addr::from(client_gateway));  
-                      
-                    // 创建 Pong 响应包  
-                    let vec = vec![0u8; 12 + 4 + ENCRYPTION_RESERVED];  
-                    let mut packet = match NetPacket::new_encrypt(vec) {  
-                        Ok(p) => p,  
-                        Err(e) => return Ok(Err(e.into())),  
-                    };  
-                    packet.set_protocol(Protocol::Control);  
-                    packet.set_transport_protocol(control_packet::Protocol::Pong.into());  
-                    if let Err(e) = packet.set_payload(net_packet.payload()) {  
-                        return Ok(Err(e.into()));  
-                    }  
-                    let mut pong_packet = match control_packet::PongPacket::new(packet.payload_mut()) {  
-                        Ok(p) => p,  
-                        Err(e) => return Ok(Err(e.into())),  
-                    };  
-                      
-                    // 设置 epoch  
-                    if let Some(link_ctx) = &context.link_context {  
-                        let epoch = link_ctx.network_info.read().epoch;  
-                        pong_packet.set_epoch(epoch as u16);  
-                    } else {  
-                        pong_packet.set_epoch(0);  
-                    }  
-                      
-                    // 设置正确的源地址和目标地址  
-                    packet.set_source(client_gateway.into());  
-                    packet.set_destination(source);  
-                    packet.set_default_version();  
-                    packet.first_set_ttl(MAX_TTL);  
-                    packet.set_gateway_flag(true);  
-                      
-                    // 关键修改:使用 common_param 进行加密  
-                    let mut response = match self.common_param(packet, addr, tcp_sender, server_secret) {  
-                        Ok(p) => p,  
-                        Err(e) => return Ok(Err(e)),  
-                    };  
-                      
-                    // 重新设置源地址和目标地址(因为 common_param 可能会覆盖)  
-                    response.set_source(client_gateway.into());  
-                    response.set_destination(source);  
-                      
-                    println!("发送 Pong 包: 源={}, 目标={}", Ipv4Addr::from(client_gateway), source);  
-                      
-                    return Ok(Ok(Some(response)));  
-                }  
+    println!("检测到客户端网段网关心跳包: 源={}, 目标={}", source, destination);  
+    let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
+    println!("准备响应 Pong: 网关={}", Ipv4Addr::from(client_gateway));  
+      
+    // 创建 Pong 响应包  
+    let vec = vec![0u8; 12 + 4 + ENCRYPTION_RESERVED];  
+    let mut packet = match NetPacket::new_encrypt(vec) {  
+        Ok(p) => p,  
+        Err(e) => return Ok(Err(e.into())),  
+    };  
+    packet.set_protocol(Protocol::Control);  
+    packet.set_transport_protocol(control_packet::Protocol::Pong.into());  
+    if let Err(e) = packet.set_payload(net_packet.payload()) {  
+        return Ok(Err(e.into()));  
+    }  
+    let mut pong_packet = match control_packet::PongPacket::new(packet.payload_mut()) {  
+        Ok(p) => p,  
+        Err(e) => return Ok(Err(e.into())),  
+    };  
+      
+    // 设置 epoch  
+    if let Some(link_ctx) = &context.link_context {  
+        let epoch = link_ctx.network_info.read().epoch;  
+        pong_packet.set_epoch(epoch as u16);  
+    } else {  
+        pong_packet.set_epoch(0);  
+    }  
+      
+    // 设置正确的源地址和目标地址  
+    packet.set_source(client_gateway.into());  
+    packet.set_destination(source);  
+    packet.set_default_version();  
+    packet.first_set_ttl(MAX_TTL);  
+    packet.set_gateway_flag(true);  
+      
+    println!("发送 Pong 包: 源={}, 目标={}", Ipv4Addr::from(client_gateway), source);  
+      
+    return Ok(Ok(Some(packet)));  
+}
             }  
         }  
     }
