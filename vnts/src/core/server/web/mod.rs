@@ -122,7 +122,6 @@ pub async fn start(
             .service(remove_client)
             .service(private_key)
             .service(create_wg_config)
-            .service(group_list)
             .service(group_info)
             .service(check_group_password)       
             .service(verify_group_password)
