@@ -15,7 +15,7 @@ use crate::core::entity::WireGuardConfig;
 
 use crate::core::server::web::vo::req::{CreateWGData, CreateWgConfig, LoginData, RemoveClientReq};
 use crate::core::server::web::vo::res::{
-    ClientInfo, ClientStatusInfo, GroupList, NetworkInfo, WGData, WgConfig,
+    ClientInfo, ClientStatusInfo, GroupList, NetworkInfo, WGData, WgConfig, CheckPasswordResult, 
 };
 use crate::core::service::server::{generate_ip, RegisterClientRequest};
 use crate::core::store::cache::AppCache;
@@ -283,34 +283,33 @@ impl VntsWebService {
             None
         }
     }
-}
-
-pub fn check_group_password(&self, req: GroupPasswordReq) -> CheckPasswordResult {  
-    if let Some(network_info) = self.cache.virtual_network.get(&req.group) {  
-        let guard = network_info.read();  
-        CheckPasswordResult {  
-            require_password: guard.password.is_some()  
-        }  
-    } else {  
-        CheckPasswordResult {  
-            require_password: false  
-        }  
-    }  
-}  
-  
-pub fn verify_group_password(&self, req: VerifyPasswordReq) -> anyhow::Result<()> {  
-    if let Some(network_info) = self.cache.virtual_network.get(&req.group) {  
-        let guard = network_info.read();  
-        if let Some(password) = &guard.password {  
-            if password == &req.password {  
-                Ok(())  
-            } else {  
-                Err(anyhow!("密码错误"))  
+    pub fn check_group_password(&self, req: GroupPasswordReq) -> CheckPasswordResult {  
+        if let Some(network_info) = self.cache.virtual_network.get(&req.group) {  
+            let guard = network_info.read();  
+            CheckPasswordResult {  
+                require_password: guard.password.is_some()  
             }  
         } else {  
-            Ok(())  
+            CheckPasswordResult {  
+                require_password: false  
+            }  
         }  
-    } else {  
-        Err(anyhow!("组网不存在"))  
     }  
+  
+    pub fn verify_group_password(&self, req: VerifyPasswordReq) -> anyhow::Result<()> {  
+        if let Some(network_info) = self.cache.virtual_network.get(&req.group) {  
+            let guard = network_info.read();  
+            if let Some(password) = &guard.password {  
+                if password == &req.password {  
+                    Ok(())  
+                } else {  
+                    Err(anyhow!("密码错误"))  
+                }  
+            } else {  
+                Ok(())  
+            }  
+        } else {  
+            Err(anyhow!("组网不存在"))  
+        }  
+    }
 }
