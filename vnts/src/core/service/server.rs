@@ -302,6 +302,44 @@ impl ServerPacketHandler {
         tcp_sender: &Option<Sender<Vec<u8>>>,
         server_secret: bool,
     ) -> result::Result<Result<Option<NetPacket<Vec<u8>>>>, NetPacket<B>> {
+        // 检查是否是发送到客户端网段网关的心跳包  
+        if net_packet.protocol() == Protocol::Control {  
+            if let control_packet::Protocol::Ping =   
+                protocol::control_packet::Protocol::from(net_packet.transport_protocol())  
+            {  
+                let destination = net_packet.destination();  
+                let source = net_packet.source();  
+                let dest_u32: u32 = destination.into();  
+                let source_u32: u32 = source.into();  
+              
+                // 检查是否为客户端网段的 .1 地址  
+                if (dest_u32 & 0xFF) == 1 {  
+                    let source_subnet = source_u32 & 0xFFFFFF00;  
+                    let dest_subnet = dest_u32 & 0xFFFFFF00;  
+                  
+                    if source_subnet == dest_subnet {  
+                        // 响应 Pong 包  
+                        let client_gateway = (source_u32 & 0xFFFFFF00) | 1;  
+                      
+                        let vec = vec![0u8; 12 + 4 + ENCRYPTION_RESERVED];  
+                        let mut packet = NetPacket::new_encrypt(vec)?;  
+                        packet.set_protocol(Protocol::Control);  
+                        packet.set_transport_protocol(control_packet::Protocol::Pong.into());  
+                        packet.set_payload(net_packet.payload())?;  
+                        let mut pong_packet = control_packet::PongPacket::new(packet.payload_mut())?;  
+                        pong_packet.set_epoch(0);  
+                      
+                        packet.set_source(client_gateway.into());  
+                        packet.set_destination(source);  
+                        packet.set_default_version();  
+                        packet.first_set_ttl(MAX_TTL);  
+                        packet.set_gateway_flag(true);  
+                      
+                        return Ok(Ok(Some(packet)));  
+                    }  
+                }  
+            }  
+        }
         if net_packet.protocol() == Protocol::Service {
             if let service_packet::Protocol::RegistrationRequest =
                 protocol::service_packet::Protocol::from(net_packet.transport_protocol())
