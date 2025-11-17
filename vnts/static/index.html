@@ -340,7 +340,8 @@
         $('#search_select').hide();    
         $('.group_len').html('');   
     }
-  
+    searchInputWithList(tempArr)
+      
     function displayDeviceInfo(groupId, data) {
         let devices = data.clients;
         const tableBody = document.getElementById('deviceTable').getElementsByTagName('tbody')[0];
@@ -699,7 +700,70 @@ PersistentKeepalive = ${persistentKeepalive}`;
             }  
         })  
     }
-    searchInput([]);
+    // 带下拉列表的搜索功能  
+    function searchInputWithList(tempArr) {  
+        function submitGroupId() {  
+            var inputVal = $('#select_input').val().trim();  
+            if (inputVal) {  
+                $("input[name='groupId']").val(inputVal);  
+                getGroupInfoFunc(inputVal);  
+            } else {  
+                alert('请输入组网token');  
+            }  
+        }  
+  
+        $('#select_input').on('input', function() {  
+            newOptions(tempArr);  
+        });  
+  
+        $('#select_input').on('focus', function() {  
+            if ($(this).val() === '') {  
+                newOptions(tempArr);  
+            }  
+        });  
+  
+        $(document).on('click', '.li-select', function() {  
+            var groupId = $(this).data('groupid');  
+            $('#select_input').val(groupId);  
+            $('#search_select').hide();  
+            getGroupInfoFunc(groupId);  
+        });  
+  
+        $(document).on('click', function(e) {  
+            if (!$(e.target).closest('.select-content').length) {  
+                $('#search_select').hide();  
+            }  
+        });  
+  
+        $('#select_input').on('keypress', function(e) {  
+            if (e.which === 13) {  
+                submitGroupId();  
+            }  
+        });  
+  
+        $('#searchButton').on('click', function() {  
+            submitGroupId();  
+        });  
+    }
+    // 获取组网列表  
+    function loadGroupList() {  
+        postGroupList({}, function(response) {  
+            if (response && response.code === 200 && response.data) {  
+                let groupList = response.data;  
+                if (groupList.length > 0) {  
+                    searchInputWithList(groupList);  
+                    $('.group_len').html('共 ' + groupList.length + ' 个组网');  
+                } else {  
+                    searchInput([]);  
+                }  
+            } else {  
+                searchInput([]);  
+            }  
+        }, function() {  
+            searchInput([]);  
+        });  
+    }  
+    loadGroupList()
     const savedGroupId = sessionStorage.getItem('currentGroupId');  
     if (savedGroupId) {  
         $('#select_input').val(savedGroupId);  
