@@ -60,6 +60,25 @@
             background-color: #f2f2f2;
         }
 
+        /* 路由配置折叠样式 */  
+        #routeConfigToggle {  
+            user-select: none;  
+        }  
+  
+        #routeConfigToggle:hover {  
+            background-color: #e8e8e8;  
+        }  
+  
+        #routeToggleIcon {  
+            display: inline-block;  
+            margin-right: 5px;  
+            transition: transform 0.3s;  
+        }  
+  
+        #routeToggleIcon.expanded {  
+            transform: rotate(90deg);  
+        }  
+  
         /* 路由配置样式 */  
         .route-item {  
             background-color: #f9f9f9;  
@@ -116,17 +135,7 @@
   
         #addRouteBtn:hover {  
             background-color: #5a6268;  
-        }  
-  
-        #cancelButton {  
-            background-color: #f44336;  
-            color: white;  
-        }  
-  
-        #cancelButton:hover {  
-            background-color: #e53935;  
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);  
-        }
+        } 
     </style>
 </head>
 <body>
@@ -219,7 +228,7 @@
 </div>
 <!-- 添加wg弹窗 -->
 <div id="addModal" class="modal">  
-    <div class="add-modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">  
+    <div class="add-modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">  
         <span class="close">&times;</span>  
         <h2>WireGuard配置</h2>  
         <div class="form-group">  
@@ -247,21 +256,25 @@
             <input type="number" id="persistentKeepalive" value="10" placeholder="PersistentKeepalive">  
         </div>  
           
-        <!-- 路由配置区域 -->  
+        <!-- 路由配置区域 - 折叠式 -->  
         <div class="form-group" style="display: block;">  
-            <label style="display: block; margin-bottom: 5px;">路由配置 (可选)</label>  
-            <small style="display: block; color: #666; margin-bottom: 10px;">配置此WireGuard客户端可访问的vnt客户端内网网段</small>  
-            <div id="routeList">  
-                <!-- 动态添加的路由条目 -->  
+            <div id="routeConfigToggle" style="cursor: pointer; padding: 10px; background-color: #f0f0f0; border-radius: 4px; margin-bottom: 10px;">  
+                <span id="routeToggleIcon">▶</span>  
+                <strong>路由配置 (可选)</strong>  
+                <small style="display: block; color: #666; margin-top: 5px;">点击展开配置此WireGuard客户端可访问的vnt客户端内网网段</small>  
             </div>  
-            <button type="button" id="addRouteBtn" style="margin-top: 10px;">  
-                添加路由  
-            </button>  
+            <div id="routeConfigContent" style="display: none;">  
+                <div id="routeList">  
+                    <!-- 动态添加的路由条目 -->  
+                </div>  
+                <button type="button" id="addRouteBtn" style="margin-top: 10px;">  
+                    添加路由  
+                </button>  
+            </div>  
         </div>  
           
         <div class="button-container">  
             <button id="confirmButton">确认</button>  
-            <button id="cancelButton" class="close">取消</button>  
         </div>  
         <div class="error" id="addWGError"></div>  
     </div>  
@@ -278,7 +291,7 @@
     // console.log("auth" + auth)
 </script>
 <script>
-    /* 点击按钮设置下拉菜单的显示与隐藏 */
+    // 点击按钮设置下拉菜单的显示与隐藏
 
     function newOptions(tempArr) {
         var listArr = [];
@@ -301,7 +314,7 @@
     }
     
     function searchInput(tempArr) {  
-        /* 提取提交逻辑为独立函数 */
+        // 提取提交逻辑为独立函数 
         function submitGroupId() {  
             var inputVal = $('#select_input').val().trim();    
             if (inputVal) {  
@@ -312,14 +325,14 @@
             }  
         }  
       
-        /* 回车键提交 */
+        // 回车键提交 
         $('#select_input').on('keypress', function (e) {    
             if (e.which === 13) {   
                 submitGroupId();  
             }    
         });  
-      
-        /* 按钮点击提交 */
+
+        // 按钮点击提交 
         $('#searchButton').on('click', function() {  
             submitGroupId();  
         });  
@@ -431,10 +444,23 @@ PersistentKeepalive = ${persistentKeepalive}`;
 <script>
     let groupId;
     let deviceId = 'wg' + new Date().getTime();
-    /* 路由配置管理 */
+    // 路由配置折叠/展开功能  
+    $('#routeConfigToggle').on('click', function() {  
+        const content = $('#routeConfigContent');  
+        const icon = $('#routeToggleIcon');  
+      
+        if (content.is(':visible')) {  
+            content.slideUp(300);  
+            icon.removeClass('expanded');  
+        } else {  
+            content.slideDown(300);  
+            icon.addClass('expanded');  
+        }  
+    });
+    // 路由配置管理 
     let routeIndex = 0;  
   
-    /* 添加路由条目 */
+    // 添加路由条目 
     $('#addRouteBtn').click(function() {  
         const routeHtml = `  
             <div class="route-item" data-index="${routeIndex}">  
@@ -452,7 +478,7 @@ PersistentKeepalive = ${persistentKeepalive}`;
         $('#routeList').append(routeHtml);  
         routeIndex++;  
     });
-    /* 删除路由条目 */
+    // 删除路由条目 
     $(document).on('click', '.remove-route', function() {  
         $(this).closest('.route-item').remove();  
     }); 
@@ -503,7 +529,7 @@ PersistentKeepalive = ${persistentKeepalive}`;
             $('#addWGError').text('PersistentKeepalive必须是0~65535');
             return;
         }
-        /* 收集路由配置 */
+        // 收集路由配置 
         const routes = [];  
         $('.route-item').each(function() {  
             const gatewayIp = $(this).find('.route-gateway').val().trim();  
@@ -517,7 +543,7 @@ PersistentKeepalive = ${persistentKeepalive}`;
                     return false;  
                 }  
               
-                /* 验证 CIDR 格式 */
+                // 验证 CIDR 格式 
                 const cidrPattern = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;  
                 if (!cidrPattern.test(network)) {  
                     $('#addWGError').text('内网网段格式错误，应为CIDR格式(如: 192.168.1.0/24): ' + network);  
@@ -530,7 +556,7 @@ PersistentKeepalive = ${persistentKeepalive}`;
                 });  
             }  
         }); 
-        /* 构建请求数据 */  
+        // 构建请求数据 
         const requestData = {  
             'group_id': groupId,  
             'virtual_ip': virtualIP,  
@@ -542,7 +568,7 @@ PersistentKeepalive = ${persistentKeepalive}`;
                 'persistent_keepalive': parseInt(persistentKeepalive),  
             }  
         };
-        /* 如果有路由配置，添加到请求中 */
+        // 如果有路由配置，添加到请求中 
         if (routes.length > 0) {  
             requestData.routes = routes;  
         } 
@@ -682,10 +708,6 @@ PersistentKeepalive = ${persistentKeepalive}`;
     $('.close').on('click', function () {
         $('#wgConfigModal').hide();
         $('#addModal').hide();
-    });
-    /* 取消按钮事件（添加到现有的 .close 事件处理器中） */
-    $('#cancelButton').on('click', function() {  
-        $('#addModal').hide();  
     });
     $('#toggleButton').on('click', function () {
         if ($('#qrcode').hasClass('visible')) {
