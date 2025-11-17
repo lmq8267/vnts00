@@ -11,11 +11,11 @@ use crossbeam_utils::atomic::AtomicCell;
 use ipnetwork::Ipv4Network;
 use rsa::rand_core::RngCore;
 
-use crate::core::entity::WireGuardConfig;
+use crate::core::entity::{WireGuardConfig, RouteConfig};
 
-use crate::core::server::web::vo::req::{CreateWGData, CreateWgConfig, LoginData, RemoveClientReq};
+use crate::core::server::web::vo::req::{CreateWGData, CreateWgConfig, LoginData, RemoveClientReq, RouteConfigReq};
 use crate::core::server::web::vo::res::{
-    ClientInfo, ClientStatusInfo, NetworkInfo, WGData, WgConfig,
+    ClientInfo, ClientStatusInfo, NetworkInfo, WGData, WgConfig, RouteConfigRes,
 };
 use crate::core::service::server::{generate_ip, RegisterClientRequest};
 use crate::core::store::cache::AppCache;
@@ -137,6 +137,39 @@ impl VntsWebService {
                 }  
             }  
         }
+        // 解析和验证路由配置  
+        let mut routes = Vec::new();  
+        let mut allowed_ips = vec![network.to_string()];  
+      
+        if let Some(route_configs) = &wg_data.routes {  
+            for route_req in route_configs {  
+                // 解析 vnt-cli 虚拟IP  
+                let vnt_cli_ip = Ipv4Addr::from_str(&route_req.vnt_cli_ip)  
+                    .context(format!("无效的vnt-cli虚拟IP: {}", route_req.vnt_cli_ip))?;  
+              
+                // 验证 vnt-cli IP 是否在虚拟网络范围内  
+                if !network.contains(vnt_cli_ip) {  
+                    Err(anyhow!("vnt-cli虚拟IP {} 不在网络范围 {} 内", vnt_cli_ip, network))?;  
+                }  
+              
+                // 解析内网网段（CIDR格式）  
+                let lan_network_str = route_req.lan_network.trim();  
+                let _lan_network = Ipv4Network::from_str(lan_network_str)  
+                    .context(format!("无效的内网网段格式: {}", lan_network_str))?;  
+              
+                // 添加到路由配置  
+                routes.push(RouteConfig {  
+                    vnt_cli_ip,  
+                    lan_network: lan_network_str.to_string(),  
+                });  
+              
+                // 添加到 AllowedIPs  
+                allowed_ips.push(lan_network_str.to_string());  
+            }  
+        }  
+      
+        let vnts_allowed_ips = allowed_ips.join(", "); 
+        
         let register_client_request = RegisterClientRequest {
             group_id: group_id.clone(),
             virtual_ip,
@@ -165,8 +198,30 @@ impl VntsWebService {
             persistent_keepalive: wg_data.config.persistent_keepalive,
             secret_key,
             public_key,
+            routes: routes.clone(), 
         };
-        cache.wg_group_map.insert(public_key, wireguard_config);
+        
+        cache.wg_group_map.insert(public_key, wireguard_config.clone());  
+        
+        // 更新 NetworkInfo 的路由表  
+        if let Some(network_info) = cache.virtual_network.get(&group_id) {  
+            let mut guard = network_info.write();  
+          
+            // 解析路由配置为路由表格式  
+            let mut route_entries = Vec::new();  
+            for route in &routes {  
+                if let Ok(lan_net) = Ipv4Network::from_str(&route.lan_network) {  
+                    let dest = u32::from(lan_net.network());  
+                    let mask = u32::from(lan_net.mask());  
+                    route_entries.push((dest, mask, route.vnt_cli_ip));  
+                }  
+            }  
+          
+            // 将路由条目存储到 NetworkInfo 的路由表中  
+            guard.route_table.insert(public_key, route_entries);  
+            guard.epoch += 1;  
+        }
+        
         // 保存配置到文件  
         if let Err(e) = cache.save_wg_configs() {  
             log::warn!("保存WireGuard配置失败: {:?}", e);  
@@ -180,6 +235,10 @@ impl VntsWebService {
             ip: response.virtual_ip,
             prefix: network.prefix(),
             persistent_keepalive: wg_data.config.persistent_keepalive,
+            routes: routes.iter().map(|r| RouteConfigRes {  
+                vnt_cli_ip: r.vnt_cli_ip,  
+                lan_network: r.lan_network.clone(),  
+            }).collect(),
         };
         let wg_data = WGData {
             group_id,
