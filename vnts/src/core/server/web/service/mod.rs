@@ -220,7 +220,7 @@ impl VntsWebService {
         }  
         let wireguard_config = WireGuardConfig {
             vnts_endpoint: wg_data.config.vnts_endpoint.clone(),
-            vnts_allowed_ips: network.to_string(),
+            vnts_allowed_ips: vnts_allowed_ips.clone(),
             group_id: group_id.clone(),
             device_id: device_id.clone(),
             ip: response.virtual_ip,
@@ -259,7 +259,7 @@ impl VntsWebService {
         let config = WgConfig {
             vnts_endpoint: wg_data.config.vnts_endpoint,
             vnts_public_key: general_purpose::STANDARD.encode(&self.config.wg_public_key),
-            vnts_allowed_ips: network.to_string(),
+            vnts_allowed_ips,
             public_key: general_purpose::STANDARD.encode(public_key),
             private_key: general_purpose::STANDARD.encode(secret_key),
             ip: response.virtual_ip,
