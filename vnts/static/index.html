@@ -219,20 +219,31 @@
     }
     
     function searchInput(tempArr) {  
-        $('#select_input').on('keypress', function (e) {  
-            if (e.which === 13) { 
-                var inputVal = $(this).val().trim();  
-                if (inputVal) {   
-                    $("input[name='groupId']").val(inputVal);  
-                    getGroupInfoFunc(inputVal);  
-                } else {  
-                    alert('请输入组网token');  
-                }  
+        /* 提取提交逻辑为独立函数 */
+        function submitGroupId() {  
+            var inputVal = $('#select_input').val().trim();    
+            if (inputVal) {  
+                $("input[name='groupId']").val(inputVal);    
+                getGroupInfoFunc(inputVal);    
+            } else {    
+                alert('请输入组网token');    
             }  
+        }  
+      
+        /* 回车键提交 */
+        $('#select_input').on('keypress', function (e) {    
+            if (e.which === 13) {   
+                submitGroupId();  
+            }    
         });  
       
-        $('#search_select').hide();  
-        $('.group_len').html(''); 
+        /* 按钮点击提交 */
+        $('#searchButton').on('click', function() {  
+            submitGroupId();  
+        });  
+        
+        $('#search_select').hide();    
+        $('.group_len').html('');   
     }
   
     function displayDeviceInfo(groupId, data) {
