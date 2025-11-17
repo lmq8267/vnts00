@@ -82,11 +82,3 @@ function postCreateWG(requestData, success, error) {
 function postRemoveClient(requestData, success, error) {
     post("api/remove_client", requestData, success, error)
 }
-
-function postCheckGroupPassword(requestData, success, error) {  
-    post("api/check_group_password", requestData, success, error)  
-}  
-  
-function postVerifyGroupPassword(requestData, success, error) {  
-    post("api/verify_group_password", requestData, success, error)  
-}
