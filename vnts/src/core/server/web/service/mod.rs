@@ -379,4 +379,15 @@ impl VntsWebService {
             None
         }
     }
+    pub fn is_group_list_disabled(&self) -> bool {  
+        self.config.disable_group_list  
+    }  
+  
+    pub fn get_group_list(&self) -> Vec<String> {  
+        self.cache  
+            .virtual_network  
+            .iter()  
+            .map(|entry| entry.key().clone())  
+            .collect()  
+    }
 }
