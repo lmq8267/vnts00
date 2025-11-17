@@ -372,17 +372,27 @@ impl WireGuard {
         data: &mut [u8],
         dst_buf: &mut [u8],
     ) -> anyhow::Result<()> {
+        log::warn!(  
+            "[WG转发] 收到数据包: src={}, dest={}, len={}",  
+            src_ip,  
+            dest_ip,  
+            data.len()  
+        );
         // 网关 ping 处理  
         if dest_ip == self.gateway_ip {  
+            log::warn!("[WG转发] 目标是网关IP {}, 处理ping", dest_ip);
             if self.ping(data, src_ip, dest_ip).is_ok() {  
                 if let Err(e) = self.handle_ipv4_data(&data, dst_buf).await {  
                     log::warn!("发送ping回应到wg失败,{:?}", e)  
-                }  
+                } else {  
+                    log::warn!("[WG转发] ping回应已发送");  
+                }
             }  
             return Ok(());  
         }
         // 广播处理  
         if dest_ip.is_broadcast() || dest_ip == self.broadcast_ip {  
+            log::warn!("[WG转发] 目标是广播地址 {}", dest_ip);
             let x: Vec<_> = self  
                 .network_info  
                 .read()  
@@ -398,6 +408,7 @@ impl WireGuard {
                     )  
                 })  
                 .collect();  
+            log::warn!("[WG转发] 广播到 {} 个在线客户端", x.len());
             for (peer_addr, peer_tcp_sender, server_secret, peer_wg_sender) in x {  
                 if let Err(e) = self  
                     .send_one(  
@@ -423,12 +434,20 @@ impl WireGuard {
         // 检查目标 IP 是否在虚拟网络范围内    
         let in_network = (u32::from(dest_ip) & u32::from(self.mask_ip))     
             == (u32::from(self.gateway_ip) & u32::from(self.mask_ip)); 
+
+        log::warn!(  
+            "[WG转发] 目标IP {} 是否在虚拟网络内: {}, 网络={}, 掩码={}",  
+            dest_ip,  
+            in_network,  
+            self.gateway_ip,  
+            self.mask_ip  
+        );
           
         // 如果目标不在虚拟网络内，进行路由查找  
         if !in_network {  
             if let Some(gateway_ip) = self.route_lookup(&dest_ip) {  
                 // 找到路由网关，修改目标 IP  
-                log::debug!(  
+                log::info!(  
                     "WireGuard路由: {} -> {} (网关: {})",  
                     dest_ip,  
                     dest_ip,  
@@ -437,22 +456,36 @@ impl WireGuard {
                 gateway_ip_for_lookup = gateway_ip;  
             } else {  
                 // 没有匹配的路由，丢弃数据包  
-                log::debug!("WireGuard: 未找到到 {} 的路由，丢弃数据包", dest_ip);  
+                log::info!("WireGuard: 未找到到 {} 的路由，丢弃数据包", dest_ip);  
                 return Ok(());  
             }  
         } else {  
             // 在虚拟网络内，直接使用 dest_ip  
             gateway_ip_for_lookup = dest_ip;  
         } 
+        log::info!(  
+            "[WG转发] 查找客户端: gateway_ip_for_lookup={}, 原始dest_ip={}",  
+            gateway_ip_for_lookup,  
+            dest_ip  
+        ); 
 
         // 使用 target_ip 查找客户端并转发  
         let (server_secret, peer_addr, peer_tcp_sender, peer_wg_sender) = {  
             let guard = self.network_info.read();  
             if let Some(dest_client_info) = guard.clients.get(&gateway_ip_for_lookup.into()) {  
+                log::info!(  
+                    "[WG转发] 找到目标客户端: ip={}, online={}, addr={}, is_wg={}",  
+                    gateway_ip_for_lookup,  
+                    dest_client_info.online,  
+                    dest_client_info.address,  
+                    dest_client_info.wireguard.is_some()  
+                );
                 if !dest_client_info.online {  
+                    log::warn!("[WG转发] 目标客户端 {} 不在线", gateway_ip_for_lookup);
                     Err(anyhow!("目标不在线"))?  
                 }  
                 if dest_client_info.virtual_ip == u32::from(self.ip) {  
+                    log::warn!("[WG转发] 检测到回路: 目标IP与源IP相同");
                     Err(anyhow!("阻止回路"))?  
                 }  
                 let server_secret = dest_client_info.server_secret;  
@@ -461,10 +494,21 @@ impl WireGuard {
                 let peer_wg_sender = dest_client_info.wg_sender.clone();  
                 (server_secret, peer_addr, peer_tcp_sender, peer_wg_sender)  
             } else {  
+                log::warn!(  
+                    "[WG转发] 未找到客户端 {}。当前在线客户端: {:?}",  
+                    gateway_ip_for_lookup,  
+                    guard.clients.keys().collect::<Vec<_>>()  
+                );
                 Err(anyhow!("目标未注册"))?  
             }  
         };
-
+        log::info!(  
+            "[WG转发] 准备发送: src={} -> dest={} (通过网关客户端 {} @ {})",  
+            src_ip,  
+            dest_ip,  // 关键：这里使用原始目标IP  
+            gateway_ip_for_lookup,  
+            peer_addr  
+        );
         self.send_one(  
             peer_addr,  
             peer_tcp_sender,  
@@ -475,7 +519,8 @@ impl WireGuard {
             data,  
             dst_buf,  
         )  
-        .await?;  
+        .await?; 
+        log::debug!("[WG转发] 数据包发送成功"); 
         Ok(())
     }
     async fn send_one(
