@@ -68,6 +68,10 @@ pub struct StartArgs {
     /// wg私钥，使用base64编码
     #[arg(long = "wg")]
     wg_secret_key: Option<String>,
+    #[cfg(feature = "web")]  
+    // 禁用web界面显示所有组网token列表，启用后必须手动搜索才能查看  
+    #[arg(long, default_value_t = false)]  
+    disable_group_list: bool,
 }
 
 #[derive(Clone)]
@@ -84,6 +88,8 @@ pub struct ConfigInfo {
     pub password: String,
     pub wg_secret_key: StaticSecret,
     pub wg_public_key: PublicKey,
+    #[cfg(feature = "web")]  
+    pub disable_group_list: bool,
 }
 impl Debug for ConfigInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -296,6 +302,8 @@ async fn main() {
         password: args.password.unwrap_or_else(|| "admin".into()),
         wg_secret_key,
         wg_public_key,
+        #[cfg(feature = "web")]  
+        disable_group_list: args.disable_group_list,
     };
     let rsa = match RsaCipher::new(root_path) {
         Ok(rsa) => {
