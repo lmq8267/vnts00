@@ -90,6 +90,7 @@ pub struct ConfigInfo {
     pub wg_public_key: PublicKey,
     #[cfg(feature = "web")]  
     pub disable_group_list: bool,
+    pub disable_relay: bool,
 }
 impl Debug for ConfigInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -100,6 +101,7 @@ impl Debug for ConfigInfo {
             .field("broadcast", &self.broadcast)
             .field("netmask", &self.netmask)
             .field("check_finger", &self.check_finger)
+            .field("disable_relay", &self.disable_relay)
             .field(
                 "wg_secret_key",
                 &general_purpose::STANDARD.encode(&self.wg_secret_key),
